@@ -448,7 +448,8 @@
       } catch (err) {
         if (!alive()) return;
         console.error(err);
-        setStatus(err.message || "Something went wrong. Please press Go to try again.", true);
+        // The daily limit isn't a failure, so it gets the calm style, not red.
+        setStatus(err.message || "Something went wrong. Please press Go to try again.", err.status !== 429);
         stepsEl.querySelectorAll("li.active").forEach((li) => li.classList.remove("active"));
       } finally {
         if (alive()) { setLocked(false); screen.classList.remove("busy"); }

@@ -1,11 +1,14 @@
 import { fal, MODELS, VOICE, json, fail, readJson, verify } from "../lib/shared.mjs";
+import { remaining, LIMIT_MESSAGE } from "../lib/limit.mjs";
 
 // Queues the text-to-speech job and returns at once; the page polls /api/status.
-export default async (req) => {
+export default async (req, context) => {
   if (req.method !== "POST") return fail("Use POST", 405);
   const { script, sig } = await readJson(req);
   // Only voice text that /api/enhance approved (the enhanced script, or an original it allowed reverting to).
   if (!verify(script, sig)) return fail("Please press Enhance before Go.");
+  // Check the daily limit up front so we don't pay for a voice we won't animate.
+  if ((await remaining(req, context)) <= 0) return json({ error: LIMIT_MESSAGE, limited: true }, 429);
 
   try {
     const { request_id } = await fal.queue.submit(MODELS.voice, {

@@ -10,7 +10,8 @@
   "homepage": "https://github.com/cartercygan/JotPsych#readme",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
-    "@fal-ai/client": "^1.10.1"
+    "@fal-ai/client": "^1.10.1",
+    "@netlify/blobs": "^11.1.4"
   },
   "private": true
 }
