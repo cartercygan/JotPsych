@@ -11,7 +11,8 @@ export const MODELS = {
 };
 
 export const VOICE = "Matilda";
-export const MAX_SECONDS = 20;
+// Hard stop on spoken length. Scripts aim for ~20s; the brief allows up to 60s.
+export const MAX_SECONDS = 30;
 
 export const json = (body, status = 200) =>
   new Response(JSON.stringify(body), {

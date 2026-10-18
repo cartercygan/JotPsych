@@ -418,8 +418,9 @@
           checkResult.className = "notice";
           checkResult.innerHTML = `<strong>This needs a few changes before Tomo can say it.</strong>
             <ul>${result.issues.map((i) => `<li><span class="tag">${labels[i.type] || "Note"}:</span> ${escapeHtml(i.reason)}</li>`).join("")}</ul>
-            Fix these and check again, or press Enhance to fix them for you.`;
+            Edit your text above and check again, or press Enhance to fix it for you.`;
           setStatus("");
+          input.focus();
         }
         checkResult.hidden = false;
         syncGo();
@@ -443,7 +444,7 @@
       } else if (draft.blocked === "off_topic") {
         html = `<strong>That doesn't look like a JotPsych feature.</strong> Tomo will share a short JotPsych introduction instead.`;
       } else if (draft.blocked === "too_long") {
-        html = `<strong>Your original is too long for a 20-second video.</strong> Use the enhanced script, or edit yours to be shorter.`;
+        html = `<strong>Your original is too long for a 30-second video.</strong> Use the enhanced script, or edit yours to be shorter.`;
       }
       notice.innerHTML = html;
       notice.hidden = !html;
@@ -551,7 +552,9 @@
           saveJob({ stage: "voice", id: voiceId });
           const voice = await poll("voice", voiceId, VOICE_TIMEOUT_MS, alive);
           if (!alive()) return;
-          if (voice.tooLong) throw new Error("That script runs longer than 20 seconds. Press Edit, shorten it, and Enhance again.");
+          if (voice.tooLong) throw new Error(review.hidden
+            ? "That script runs over 30 seconds. Shorten it in the box above, then check or enhance it again."
+            : "That script runs over 30 seconds. Press Edit, shorten it, then check or enhance it again.");
           words = voice.words;
           setStep("video");
           setStatus("Animating Tomo. Almost there…");

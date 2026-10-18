@@ -4,8 +4,8 @@ import { JOTPSYCH_FACTS } from "../lib/facts.mjs";
 
 const anthropic = new Anthropic({ timeout: 9000, maxRetries: 0 });
 
-// Text Tomo says as-is must fit in about 20 seconds.
-const MAX_WORDS = 50;
+// Text Tomo says as-is must stay under the 30-second hard stop (~2.7 words a second, with margin).
+const MAX_WORDS = 70;
 
 const SYSTEM = `You review a script that JotPsych's mascot, Tomo the bear, will read aloud word for word in a short video. You do NOT rewrite it. You only decide whether it can be used exactly as written.
 
@@ -57,7 +57,7 @@ export default async (req) => {
     : [];
   if (!result.on_topic) issues.unshift({ type: "topic", reason: "This doesn't describe a JotPsych feature." });
   if (countWords(text) > MAX_WORDS)
-    issues.push({ type: "length", reason: `It's ${countWords(text)} words; Tomo can say about ${MAX_WORDS} in 20 seconds.` });
+    issues.push({ type: "length", reason: `It's ${countWords(text)} words; Tomo can say about ${MAX_WORDS} in 30 seconds.` });
 
   const passed = issues.length === 0;
   // Same signature as Enhance, so /api/voice accepts it. The page sends the text exactly as checked.

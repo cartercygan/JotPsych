@@ -8,8 +8,8 @@ const anthropic = new Anthropic({ timeout: 9000, maxRetries: 0 });
 const FALLBACK_SCRIPT =
   "Let’s get back to what matters. JotPsych is an AI scribe built for behavioral health. It listens to your sessions and turns them into clear, complete notes, so you can spend less time on documentation and more time with your patients. JotPsych. Less charting, more caring.";
 
-// The longest original text we'll let someone keep verbatim: ~50 words is about 20 seconds of speech.
-const MAX_REVERT_WORDS = 50;
+// The longest original text we'll let someone keep verbatim: ~70 words stays under the 30-second hard stop.
+const MAX_REVERT_WORDS = 70;
 
 const SYSTEM = `You write the lines for JotPsych's mascot: a cuddly plush bear in a midnight-blue sweater, standing in a cozy therapy office by the fireplace. JotPsych is an AI scribe and practice platform for behavioral health clinicians.
 
