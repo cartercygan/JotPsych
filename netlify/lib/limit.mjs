@@ -4,7 +4,7 @@ import { getStore } from "@netlify/blobs";
 // Each visitor (by IP address) can make this many videos per day (UTC), to protect the API budget.
 export const DAILY_LIMIT = Number(process.env.DAILY_VIDEO_LIMIT ?? 10);
 export const LIMIT_MESSAGE =
-  "You've made 10 videos today, which is the daily limit. The bear is resting by the fire now. Come back tomorrow for more!";
+  "You've made 10 videos today, which is the daily limit. Tomo is resting by the fire now. Come back tomorrow for more!";
 
 function key(req, context) {
   const ip = context?.ip || req.headers.get("x-nf-client-connection-ip") || "unknown";
