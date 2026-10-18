@@ -19,6 +19,7 @@ JOB 1: GUARDRAILS. Before writing, check the input for problems. Report each one
 - "phi": protected health information or patient details: patient names, initials tied to a case, dates of birth, addresses, phone numbers, emails, record or insurance ID numbers, specific diagnoses or medications tied to a person, or a story about an identifiable patient. Remove it entirely; speak only in general terms.
 - "accuracy": ONLY (a) a statement the JotPsych facts below directly contradict, or (b) a statistic, number, percentage, guarantee, certification, award, or customer claim that the facts do not state. Remove or correct it using only the facts. Never invent numbers.
 - "confidential": internal or non-public information (unreleased plans, internal metrics, customer or employee names, pricing deals). Remove it.
+If <confirmed_facts> are given, the person has already verified those statistics and data points. Treat them as accurate: keep them in the script (you may rephrase around them, but keep the figures) and never report them as issues.
 Be careful not to over-flag. These are NOT issues: a feature the facts don't mention, a feature described in different words or more specific detail than the facts, a definition or explanation the person added, or general benefits like "fewer denials" or "less typing". When in doubt, it is not an issue: describe what the person typed. Most inputs have no issues.
 Each reason is one short plain sentence.
 
@@ -41,7 +42,11 @@ Reply with only JSON:
 
 export default async (req) => {
   if (req.method !== "POST") return fail("Use POST", 405);
-  const { text: raw } = await readJson(req);
+  const { text: raw, confirmedFacts } = await readJson(req);
+  // Statistics the person confirmed via "Facts confirmed" on the Check step.
+  const confirmed = Array.isArray(confirmedFacts)
+    ? confirmedFacts.filter((f) => typeof f === "string" && f.trim()).slice(0, 10).map((f) => f.slice(0, 200))
+    : [];
   const original = typeof raw === "string" ? raw.replace(/\s+/g, " ").trim() : "";
   if (!original) return fail("Describe a JotPsych feature first.");
   if (original.length > 600) return fail("Please keep it under 600 characters.");
@@ -53,7 +58,11 @@ export default async (req) => {
       max_tokens: 800,
       thinking: { type: "between_tools" }, // no extended thinking: keeps the call within a few seconds
       system: SYSTEM,
-      messages: [{ role: "user", content: `<input>${original}</input>` }],
+      messages: [{
+        role: "user",
+        content: `<input>${original}</input>` +
+          (confirmed.length ? `\n<confirmed_facts>\n${confirmed.map((f) => `- ${f}`).join("\n")}\n</confirmed_facts>` : ""),
+      }],
     });
     const body = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("");
     result = JSON.parse(body.slice(body.indexOf("{"), body.lastIndexOf("}") + 1));

@@ -341,12 +341,11 @@
       const text = input.value.trim();
       if (!text) { setStatus("Describe a JotPsych feature first.", true); input.focus(); return; }
       const token = ++animToken;
-      factsConfirmed = false;
       enhanceBtn.disabled = checkBtn.disabled = true;
       enhanceBtn.textContent = "Enhancing…";
       setStatus("Checking accuracy and patient privacy, and polishing the tone…");
       try {
-        const result = await api("/api/enhance", { text });
+        const result = await api("/api/enhance", { text, confirmedFacts });
         if (token !== animToken) return;
         draft = result;
         useOriginal = false;
@@ -402,6 +401,7 @@
     // ---- Alternative to Enhance: check the text as written, without rewriting it ----
 
     let factsConfirmed = false; // set by "Facts confirmed"; accuracy flags then no longer block
+    let confirmedFacts = [];    // the data points confirmed, passed on to Enhance so it keeps them
     let lastCheck = null;       // { raw, result } for re-rendering after "Facts confirmed"
 
     async function checkAccuracy() {
@@ -454,7 +454,11 @@
           ${factsBlock}${otherList}
           ${others.length ? "Edit your text above and check again, or press Enhance to fix it for you." : ""}`;
         const confirmBtn = $("confirm-facts");
-        if (confirmBtn) confirmBtn.addEventListener("click", () => { factsConfirmed = true; renderCheck(); });
+        if (confirmBtn) confirmBtn.addEventListener("click", () => {
+          factsConfirmed = true;
+          confirmedFacts = [...new Set([...confirmedFacts, ...facts.map((i) => i.reason)])];
+          renderCheck();
+        });
         setStatus("");
         if (others.length) input.focus();
       }
