@@ -1,0 +1,16 @@
+{
+  "name": "jotpsych-bear-video",
+  "version": "1.0.0",
+  "description": "Turns a JotPsych feature description into a short talking-bear video",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cartercygan/JotPsych.git"
+  },
+  "type": "module",
+  "homepage": "https://github.com/cartercygan/JotPsych#readme",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
+    "@fal-ai/client": "^1.10.1"
+  },
+  "private": true
+}
