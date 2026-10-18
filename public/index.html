@@ -37,8 +37,12 @@
       gap: 40px;
       align-items: start;
     }
+    .intro { grid-column: 1; grid-row: 1; }
+    .examples { grid-column: 1; grid-row: 2; }
+    .stage { grid-column: 2; grid-row: 1 / span 2; }
     @media (max-width: 820px) {
       main { grid-template-columns: 1fr; gap: 24px; padding-top: 20px; }
+      .intro, .examples, .stage { grid-column: 1; grid-row: auto; }
       .stage { justify-self: center; width: min(100%, 380px); }
     }
 
@@ -75,7 +79,7 @@
     button.go:disabled { opacity: .55; cursor: progress; transform: none; box-shadow: 0 6px 0 var(--deep); background: var(--midnight); }
     .count { font-size: 13px; opacity: .6; margin-left: auto; }
 
-    .examples { margin-top: 22px; }
+    .examples { margin-top: 0; }
     .examples p { margin: 0 0 8px; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; opacity: .6; }
     .chip {
       display: block; width: 100%; text-align: left; cursor: pointer;
@@ -148,7 +152,7 @@
 </head>
 <body>
   <main>
-    <section>
+    <section class="intro">
       <h1>Meet the JotPsych bear</h1>
       <p class="lede">Describe a JotPsych feature, press Go, and our bear will explain it in a short video.</p>
 
@@ -169,11 +173,7 @@
       </ol>
       <div class="script" id="script"></div>
 
-      <div class="examples">
-        <p>Try an example</p>
-        <button class="chip" type="button">JotPsych listens to the visit and writes the clinical note, so the clinician does not type during the session.</button>
-        <button class="chip" type="button">JotPsych checks each claim against the payer's rules (the payer is the insurance company that pays the claim) before it is submitted, so fewer claims are denied.</button>
-      </div>
+
     </section>
 
     <section class="stage" aria-label="Video">
@@ -185,6 +185,12 @@
         </div>
       </div>
       <p class="caption-note">Vertical · about 20 seconds · with subtitles</p>
+    </section>
+
+    <section class="examples" aria-label="Examples">
+      <p>Try an example</p>
+      <button class="chip" type="button">JotPsych listens to the visit and writes the clinical note, so the clinician does not type during the session.</button>
+      <button class="chip" type="button">JotPsych checks each claim against the payer's rules (the payer is the insurance company that pays the claim) before it is submitted, so fewer claims are denied.</button>
     </section>
   </main>
 
@@ -218,7 +224,8 @@
       scriptEl.textContent = "";
       screen.classList.add("busy");
       stepsEl.hidden = false;
-      setStatus("Making a brand-new video. This takes about a minute or two.");
+      setStatus("Making a brand-new video. This takes about a minute.");
+      if (matchMedia("(max-width: 820px)").matches) screen.scrollIntoView({ behavior: "smooth", block: "center" });
 
       try {
         setStep("script");
@@ -227,6 +234,7 @@
         scriptEl.textContent = script;
 
         setStep("voice");
+        setStatus("Recording the bear's voice…");
         let voice = await recordVoice(script, alive);
         if (voice.tooLong) {
           // Over the 20-second cap: ask for a shorter script once, then record again.
@@ -308,6 +316,7 @@
 
     function setStatus(text, isError = false) {
       statusEl.textContent = text;
+      $("placeholder").textContent = text;
       statusEl.classList.toggle("error", isError);
     }
 
