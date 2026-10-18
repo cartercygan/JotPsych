@@ -206,7 +206,7 @@
         </div>
         <div class="reference" id="reference" hidden>
           <div class="review-head"><span>Last enhanced script</span>
-            <button class="link" id="use-enhanced" type="button">Copy to text box</button></div>
+            <button class="link" id="use-enhanced" type="button">Paste to text box</button></div>
           <div id="reference-body"></div>
         </div>
       </form>
@@ -237,11 +237,12 @@
     const stepsEl = $("steps"), video = $("video"), screen = $("screen"), captionsEl = $("captions");
     const POLL_MS = 3000, VOICE_TIMEOUT_MS = 90_000, VIDEO_TIMEOUT_MS = 6 * 60_000;
 
-    let draft = null;        // the latest /api/enhance result
+    let draft = null;        // the latest /api/enhance result, while it's under review
+    let lastDraft = null;    // kept after Edit, so its script can be pasted back and used as-is
     let useOriginal = false; // true after "Revert to original"
     let animToken = 0, runId = 0;
 
-    input.addEventListener("input", () => { $("count").textContent = `${input.value.length} / 600`; });
+    input.addEventListener("input", () => { $("count").textContent = `${input.value.length} / 600`; syncGo(); });
     form.addEventListener("submit", (e) => { e.preventDefault(); enhance(); });
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); enhance(); }
@@ -249,6 +250,7 @@
     goBtn.addEventListener("click", makeVideo);
     editBtn.addEventListener("click", () => {
       animToken++;
+      lastDraft = draft;
       $("reference-body").textContent = draft.script;
       draft = null;
       setMode("compose");
@@ -258,7 +260,7 @@
       input.focus();
     });
     $("use-enhanced").addEventListener("click", () => {
-      input.value = $("reference-body").textContent;
+      input.value = lastDraft.script;
       input.dispatchEvent(new Event("input"));
       input.focus();
     });
@@ -312,6 +314,15 @@
       if (!reviewing) notice.hidden = true;
       else $("reference").hidden = true;
       $("label").textContent = reviewing ? "What the bear will say" : "Describe a JotPsych feature";
+      syncGo();
+    }
+
+    // While editing, Go is offered only if the text is exactly the last enhanced script.
+    // Any change at all, even a space, means it has to be enhanced again.
+    const pastedEnhanced = () => Boolean(lastDraft) && input.value === lastDraft.script;
+    function syncGo() {
+      if (!review.hidden) return;
+      goBtn.hidden = !pastedEnhanced();
     }
 
     function renderNotice() {
@@ -400,9 +411,13 @@
     // ---- Step 2: Go (voice, then animation), polled until ready ----
 
     async function makeVideo() {
-      if (!draft) return;
-      const script = useOriginal ? draft.original : draft.script;
-      const sig = useOriginal ? draft.originalSig : draft.scriptSig;
+      let script, sig;
+      if (!review.hidden && draft) {
+        script = useOriginal ? draft.original : draft.script;
+        sig = useOriginal ? draft.originalSig : draft.scriptSig;
+      } else if (pastedEnhanced()) {
+        ({ script, scriptSig: sig } = lastDraft);
+      } else return;
       const id = ++runId;
       const alive = () => id === runId;
 
@@ -441,7 +456,7 @@
     }
 
     function setLocked(locked) {
-      goBtn.disabled = editBtn.disabled = locked;
+      goBtn.disabled = editBtn.disabled = enhanceBtn.disabled = locked;
       revertBtn.disabled = locked || Boolean(draft && draft.blocked);
       goBtn.textContent = locked ? "Making video…" : "Go";
     }
