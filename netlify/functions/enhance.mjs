@@ -17,9 +17,10 @@ You receive text someone typed about a JotPsych feature. It may be a rough descr
 
 JOB 1: GUARDRAILS. Before writing, check the input for problems. Report each one in "issues".
 - "phi": protected health information or patient details: patient names, initials tied to a case, dates of birth, addresses, phone numbers, emails, record or insurance ID numbers, specific diagnoses or medications tied to a person, or a story about an identifiable patient. Remove it entirely; speak only in general terms.
-- "accuracy": anything that contradicts the JotPsych facts below, or a statistic, number, percentage, guarantee, certification, award, or customer claim that the facts do not state. Remove or correct it using only the facts. Never invent numbers.
+- "accuracy": ONLY (a) a statement the JotPsych facts below directly contradict, or (b) a statistic, number, percentage, guarantee, certification, award, or customer claim that the facts do not state. Remove or correct it using only the facts. Never invent numbers.
 - "confidential": internal or non-public information (unreleased plans, internal metrics, customer or employee names, pricing deals). Remove it.
-A feature the facts don't mention is NOT an accuracy issue by itself: describe what the person typed, as long as it doesn't contradict the facts and adds no unverified numbers or claims.
+Be careful not to over-flag. These are NOT issues: a feature the facts don't mention, a feature described in different words or more specific detail than the facts, a definition or explanation the person added, or general benefits like "fewer denials" or "less typing". When in doubt, it is not an issue: describe what the person typed. Most inputs have no issues.
+Each reason is one short plain sentence.
 
 JOB 2: VOICE AND TONE.
 - Warm, welcoming, soothing, and gently playful. A kind friend, not a comedian: no jokes, puns, or sarcasm.
@@ -85,6 +86,6 @@ export default async (req) => {
 const clean = (s) => s.replace(/[*_#\[\]]/g, "").replace(/\s+/g, " ").trim();
 const TYPES = ["phi", "accuracy", "confidential"];
 const validIssue = (i) => i && TYPES.includes(i.type);
-const tidyIssue = (i) => ({ type: i.type, reason: String(i.reason || "").slice(0, 160) });
+const tidyIssue = (i) => ({ type: i.type, reason: String(i.reason || "").slice(0, 240) });
 
 export const config = { path: "/api/enhance" };
