@@ -135,6 +135,8 @@
       border: 1px solid color-mix(in srgb, var(--sunset) 70%, transparent);
       font-size: 14px; line-height: 1.45;
     }
+    .notice.pass { background: #E5F6EC; border-color: #1B7F4B; }
+    .notice.pass strong { color: #1B7F4B; }
     .notice strong { display: block; color: var(--deep); margin-bottom: 2px; }
     .notice ul { margin: 6px 0 0; padding-left: 18px; }
     .notice .tag { font-weight: 800; color: var(--afterglow); }
@@ -205,7 +207,7 @@
       background: linear-gradient(170deg, color-mix(in srgb, var(--afterglow) 88%, transparent), color-mix(in srgb, var(--deep) 94%, transparent) 60%);
       animation: fade-in .4s ease-out;
     }
-    .endcard-brand { margin: 0; font-size: clamp(30px, 11cqw, 42px); font-weight: 900; }
+    .endcard-logo { width: 68%; max-width: 260px; height: auto; margin-bottom: 4px; }
     .endcard-tag { margin: 0 0 8px; font-size: clamp(16px, 5.4cqw, 21px); font-weight: 800; line-height: 1.3; max-width: 15em; }
     .endcard a.go { display: inline-block; font-weight: 900; font-size: 17px; padding: 13px 28px; border-radius: 999px; transition: background .2s; text-decoration: none; background: var(--sunset); color: var(--deep); box-shadow: 0 6px 0 color-mix(in srgb, var(--sunset) 45%, var(--deep)); }
     .endcard a.go:hover { background: var(--warm); }
@@ -241,8 +243,10 @@
           <div id="review-body"></div>
         </div>
         <div class="notice" id="notice" hidden></div>
+        <div class="notice" id="check-result" hidden aria-live="polite"></div>
         <div class="row">
           <button class="go" id="enhance" type="submit">Enhance</button>
+          <button class="secondary" id="check" type="button">Check for accuracy</button>
           <button class="go" id="go" type="button" hidden>Go</button>
           <button class="secondary" id="revert" type="button" hidden>Revert to original</button>
           <button class="secondary" id="edit" type="button" hidden>Edit</button>
@@ -272,7 +276,7 @@
             <div class="breathe-text"><span>Breathe in…</span><span>Breathe out…</span></div>
           </div>
           <div class="endcard" id="endcard" hidden>
-            <p class="endcard-brand">JotPsych.</p>
+            <img class="endcard-logo" src="/jotpsych-logo-light.svg" alt="JotPsych">
             <p class="endcard-tag">The operating system for behavioral health practices.</p>
             <a class="go" href="https://jotpsych.com/" target="_blank" rel="noopener">Visit jotpsych.com</a>
             <button class="link" id="replay" type="button">Watch again</button>
@@ -293,6 +297,8 @@
 
     let draft = null;        // the latest /api/enhance result, while it's under review
     let lastDraft = null;    // kept after Edit, so its script can be pasted back and used as-is
+    let checked = null;      // text that passed "Check for accuracy": { raw, text, sig }
+    const checkBtn = $("check"), checkResult = $("check-result");
     let useOriginal = false; // true after "Revert to original"
     let animToken = 0, runId = 0;
 
@@ -302,6 +308,7 @@
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); enhance(); }
     });
     goBtn.addEventListener("click", makeVideo);
+    checkBtn.addEventListener("click", checkAccuracy);
     editBtn.addEventListener("click", () => {
       animToken++;
       lastDraft = draft;
@@ -330,7 +337,7 @@
       const text = input.value.trim();
       if (!text) { setStatus("Describe a JotPsych feature first.", true); input.focus(); return; }
       const token = ++animToken;
-      enhanceBtn.disabled = true;
+      enhanceBtn.disabled = checkBtn.disabled = true;
       enhanceBtn.textContent = "Enhancing…";
       setStatus("Checking accuracy and patient privacy, and polishing the tone…");
       try {
@@ -353,7 +360,7 @@
         if (token !== animToken) return;
         setStatus(err.message, true);
       } finally {
-        enhanceBtn.disabled = false;
+        enhanceBtn.disabled = checkBtn.disabled = false;
         enhanceBtn.textContent = "Enhance";
       }
     }
@@ -363,7 +370,8 @@
       input.hidden = reviewing;
       review.hidden = !reviewing;
       $("count").hidden = reviewing;
-      enhanceBtn.hidden = reviewing;
+      enhanceBtn.hidden = checkBtn.hidden = reviewing;
+      if (reviewing) checkResult.hidden = true;
       goBtn.hidden = revertBtn.hidden = editBtn.hidden = !reviewing;
       if (!reviewing) notice.hidden = true;
       else $("reference").hidden = true;
@@ -371,12 +379,57 @@
       syncGo();
     }
 
-    // While editing, Go is offered only if the text is exactly the last enhanced script.
-    // Any change at all, even a space, means it has to be enhanced again.
-    const pastedEnhanced = () => Boolean(lastDraft) && input.value === lastDraft.script;
+    // While editing, Go is offered only for text that was approved exactly as it is now:
+    // the pasted last enhanced script, or text that passed the accuracy check.
+    // Any change at all, even a space, means it has to be checked or enhanced again.
+    function approvedForGo() {
+      if (lastDraft && input.value === lastDraft.script) return { script: lastDraft.script, sig: lastDraft.scriptSig };
+      if (checked && input.value === checked.raw) return { script: checked.text, sig: checked.sig };
+      return null;
+    }
     function syncGo() {
       if (!review.hidden) return;
-      goBtn.hidden = !pastedEnhanced();
+      goBtn.hidden = !approvedForGo();
+      // A check result only applies to the exact text that was checked.
+      if (checkResult.dataset.raw !== undefined) checkResult.hidden = input.value !== checkResult.dataset.raw;
+    }
+
+    // ---- Alternative to Enhance: check the text as written, without rewriting it ----
+
+    async function checkAccuracy() {
+      const raw = input.value;
+      if (!raw.trim()) { setStatus("Write something to check first.", true); input.focus(); return; }
+      checkBtn.disabled = enhanceBtn.disabled = true;
+      checkBtn.textContent = "Checking…";
+      checkResult.hidden = true;
+      setStatus("Checking accuracy, patient privacy, and spelling…");
+      try {
+        const result = await api("/api/check", { text: raw });
+        if (input.value !== raw) return; // edited while checking; result no longer applies
+        const labels = { phi: "Patient information", accuracy: "Accuracy", confidential: "Confidential", spelling: "Spelling", topic: "Topic", length: "Length" };
+        checkResult.dataset.raw = raw;
+        if (result.passed) {
+          checked = { raw, text: result.text, sig: result.sig };
+          checkResult.className = "notice pass";
+          checkResult.innerHTML = "<strong>Passed: accurate, no patient information, no spelling errors.</strong> Press Go to use it exactly as written.";
+          setStatus("Ready. Press Go to make the video.");
+        } else {
+          checked = null;
+          checkResult.className = "notice";
+          checkResult.innerHTML = `<strong>This needs a few changes before Tomo can say it.</strong>
+            <ul>${result.issues.map((i) => `<li><span class="tag">${labels[i.type] || "Note"}:</span> ${escapeHtml(i.reason)}</li>`).join("")}</ul>
+            Fix these and check again, or press Enhance to fix them for you.`;
+          setStatus("");
+        }
+        checkResult.hidden = false;
+        syncGo();
+        if (!goBtn.hidden) { goBtn.classList.remove("ready"); void goBtn.offsetWidth; goBtn.classList.add("ready"); }
+      } catch (err) {
+        setStatus(err.message, true);
+      } finally {
+        checkBtn.disabled = enhanceBtn.disabled = false;
+        checkBtn.textContent = "Check for accuracy";
+      }
     }
 
     function renderNotice() {
@@ -469,8 +522,8 @@
       if (!review.hidden && draft) {
         script = useOriginal ? draft.original : draft.script;
         sig = useOriginal ? draft.originalSig : draft.scriptSig;
-      } else if (pastedEnhanced()) {
-        ({ script, scriptSig: sig } = lastDraft);
+      } else if (approvedForGo()) {
+        ({ script, sig } = approvedForGo());
       } else return;
       await runPipeline({ script, sig });
     }
@@ -549,7 +602,7 @@
     }
 
     function setLocked(locked) {
-      goBtn.disabled = editBtn.disabled = enhanceBtn.disabled = locked;
+      goBtn.disabled = editBtn.disabled = enhanceBtn.disabled = checkBtn.disabled = locked;
       revertBtn.disabled = locked || Boolean(draft && draft.blocked);
       goBtn.textContent = locked ? "Making video…" : "Go";
     }
