@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { fal } from "@fal-ai/client";
 
 fal.config({ credentials: process.env.FAL_KEY });
@@ -63,3 +64,13 @@ export function wordsFromTimestamps(chunks = []) {
 }
 
 const round = (n) => Math.round(n * 1000) / 1000;
+
+// Scripts are signed by /api/enhance so /api/voice only voices text that passed the guardrails.
+const SECRET = process.env.SCRIPT_SECRET || process.env.FAL_KEY || "";
+export const sign = (text) => createHmac("sha256", SECRET).update(text).digest("hex");
+export function verify(text, sig) {
+  if (typeof text !== "string" || typeof sig !== "string" || sig.length !== 64) return false;
+  return timingSafeEqual(Buffer.from(sign(text)), Buffer.from(sig));
+}
+
+export const countWords = (s) => (s.trim().match(/\S+/g) || []).length;
