@@ -19,7 +19,7 @@ Be careful not to over-flag. These are NOT issues: a feature the facts don't men
 
 If the text is not about JotPsych, clinical documentation, billing, or practice software (random, rude, or off-topic), set on_topic to false.
 
-Each reason is one short plain sentence.
+Each reason is one short plain sentence. For "accuracy", the reason is only the exact statistic, data point, or claim quoted from the text (under 12 words), e.g. "90% less documentation time". Do not say whether the facts state it.
 
 JotPsych facts (from jotpsych.com):
 ${JOTPSYCH_FACTS}
@@ -31,7 +31,8 @@ const TYPES = ["phi", "accuracy", "confidential", "spelling"];
 
 export default async (req) => {
   if (req.method !== "POST") return fail("Use POST", 405);
-  const { text: raw } = await readJson(req);
+  // factsConfirmed: the person has confirmed the statistics and data points themselves.
+  const { text: raw, factsConfirmed } = await readJson(req);
   const text = typeof raw === "string" ? raw.replace(/\s+/g, " ").trim() : "";
   if (!text) return fail("Write something to check first.");
   if (text.length > 600) return fail("Please keep it under 600 characters.");
@@ -59,9 +60,19 @@ export default async (req) => {
   if (countWords(text) > MAX_WORDS)
     issues.push({ type: "length", reason: `It's ${countWords(text)} words; Tomo can say about ${MAX_WORDS} in 30 seconds.` });
 
-  const passed = issues.length === 0;
+  // Accuracy flags are a heads-up the person can override with "Facts confirmed"; the rest always block.
+  const blocking = issues.filter((i) => !(factsConfirmed && i.type === "accuracy"));
+  const passed = blocking.length === 0;
+  const onlyAccuracy = issues.length > 0 && issues.every((i) => i.type === "accuracy");
   // Same signature as Enhance, so /api/voice accepts it. The page sends the text exactly as checked.
-  return json({ passed, text, sig: passed ? sign(text) : null, issues });
+  return json({
+    passed,
+    text,
+    sig: passed ? sign(text) : null,
+    // Lets "Facts confirmed" pass the text at once when accuracy is the only thing flagged.
+    sigIfConfirmed: !passed && onlyAccuracy ? sign(text) : null,
+    issues,
+  });
 };
 
 export const config = { path: "/api/check" };

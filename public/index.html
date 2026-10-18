@@ -136,6 +136,10 @@
       font-size: 14px; line-height: 1.45;
     }
     .notice.pass { background: #E5F6EC; border-color: #1B7F4B; }
+    .notice .flag { margin: 8px 0; padding: 10px 12px; border-radius: 12px; background: #fff; border: 1px solid color-mix(in srgb, var(--afterglow) 35%, transparent); }
+    .notice .flag ul { margin: 4px 0 8px; }
+    .notice ul + ul { margin-top: 0; }
+    button.secondary.small { padding: 6px 14px; font-size: 13px; }
     .notice.pass strong { color: #1B7F4B; }
     .notice strong { display: block; color: var(--deep); margin-bottom: 2px; }
     .notice ul { margin: 6px 0 0; padding-left: 18px; }
@@ -337,6 +341,7 @@
       const text = input.value.trim();
       if (!text) { setStatus("Describe a JotPsych feature first.", true); input.focus(); return; }
       const token = ++animToken;
+      factsConfirmed = false;
       enhanceBtn.disabled = checkBtn.disabled = true;
       enhanceBtn.textContent = "Enhancing…";
       setStatus("Checking accuracy and patient privacy, and polishing the tone…");
@@ -396,6 +401,9 @@
 
     // ---- Alternative to Enhance: check the text as written, without rewriting it ----
 
+    let factsConfirmed = false; // set by "Facts confirmed"; accuracy flags then no longer block
+    let lastCheck = null;       // { raw, result } for re-rendering after "Facts confirmed"
+
     async function checkAccuracy() {
       const raw = input.value;
       if (!raw.trim()) { setStatus("Write something to check first.", true); input.focus(); return; }
@@ -404,33 +412,55 @@
       checkResult.hidden = true;
       setStatus("Checking accuracy, patient privacy, and spelling…");
       try {
-        const result = await api("/api/check", { text: raw });
+        const result = await api("/api/check", { text: raw, factsConfirmed });
         if (input.value !== raw) return; // edited while checking; result no longer applies
-        const labels = { phi: "Patient information", accuracy: "Accuracy", confidential: "Confidential", spelling: "Spelling", topic: "Topic", length: "Length" };
-        checkResult.dataset.raw = raw;
-        if (result.passed) {
-          checked = { raw, text: result.text, sig: result.sig };
-          checkResult.className = "notice pass";
-          checkResult.innerHTML = "<strong>Passed: accurate, no patient information, no spelling errors.</strong> Press Go to use it exactly as written.";
-          setStatus("Ready. Press Go to make the video.");
-        } else {
-          checked = null;
-          checkResult.className = "notice";
-          checkResult.innerHTML = `<strong>This needs a few changes before Tomo can say it.</strong>
-            <ul>${result.issues.map((i) => `<li><span class="tag">${labels[i.type] || "Note"}:</span> ${escapeHtml(i.reason)}</li>`).join("")}</ul>
-            Edit your text above and check again, or press Enhance to fix it for you.`;
-          setStatus("");
-          input.focus();
-        }
-        checkResult.hidden = false;
-        syncGo();
-        if (!goBtn.hidden) { goBtn.classList.remove("ready"); void goBtn.offsetWidth; goBtn.classList.add("ready"); }
+        lastCheck = { raw, result };
+        renderCheck();
       } catch (err) {
         setStatus(err.message, true);
       } finally {
         checkBtn.disabled = enhanceBtn.disabled = false;
         checkBtn.textContent = "Check for accuracy";
       }
+    }
+
+    function renderCheck() {
+      const { raw, result } = lastCheck;
+      const labels = { phi: "Patient information", confidential: "Confidential", spelling: "Spelling", topic: "Topic", length: "Length" };
+      const facts = result.issues.filter((i) => i.type === "accuracy");
+      const others = result.issues.filter((i) => i.type !== "accuracy");
+      const factList = `<ul>${facts.map((i) => `<li>${escapeHtml(i.reason)}</li>`).join("")}</ul>`;
+      const sig = result.sig || (factsConfirmed && result.sigIfConfirmed);
+      checkResult.dataset.raw = raw;
+
+      if (sig) {
+        checked = { raw, text: result.text, sig };
+        checkResult.className = "notice pass";
+        checkResult.innerHTML = facts.length
+          ? `<strong>Passed: no patient information or spelling errors, and you confirmed these facts:</strong>${factList}Press Go to use it exactly as written.`
+          : "<strong>Passed: accurate, no patient information, no spelling errors.</strong> Press Go to use it exactly as written.";
+        setStatus("Ready. Press Go to make the video.");
+      } else {
+        checked = null;
+        checkResult.className = "notice";
+        const factsBlock = !facts.length ? "" : factsConfirmed
+          ? `<div class="flag"><span class="tag">Accuracy:</span> Facts confirmed by you.${factList}</div>`
+          : `<div class="flag"><span class="tag">Accuracy:</span> This uses statistics or specific data points. Check that they're accurate before proceeding.${factList}
+              <button class="secondary small" id="confirm-facts" type="button">Facts confirmed</button></div>`;
+        const otherList = others.length
+          ? `<ul>${others.map((i) => `<li><span class="tag">${labels[i.type] || "Note"}:</span> ${escapeHtml(i.reason)}</li>`).join("")}</ul>`
+          : "";
+        checkResult.innerHTML = `<strong>${others.length ? "This needs a few changes before Tomo can say it." : "Please confirm these facts before Tomo says them."}</strong>
+          ${factsBlock}${otherList}
+          ${others.length ? "Edit your text above and check again, or press Enhance to fix it for you." : ""}`;
+        const confirmBtn = $("confirm-facts");
+        if (confirmBtn) confirmBtn.addEventListener("click", () => { factsConfirmed = true; renderCheck(); });
+        setStatus("");
+        if (others.length) input.focus();
+      }
+      checkResult.hidden = false;
+      syncGo();
+      if (!goBtn.hidden) { goBtn.classList.remove("ready"); void goBtn.offsetWidth; goBtn.classList.add("ready"); }
     }
 
     function renderNotice() {
