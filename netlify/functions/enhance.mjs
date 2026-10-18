@@ -22,14 +22,14 @@ JOB 1: GUARDRAILS. Before writing, check the input for problems. Report each one
 Be careful not to over-flag. These are NOT issues: a feature the facts don't mention, a feature described in different words or more specific detail than the facts, a definition or explanation the person added, or general benefits like "fewer denials" or "less typing". When in doubt, it is not an issue: describe what the person typed. Most inputs have no issues.
 Each reason is one short plain sentence.
 
-JOB 2: VOICE AND TONE.
-- Warm, welcoming, soothing, and gently playful. A kind friend, not a comedian: no jokes, puns, or sarcasm.
-- Speak directly to clinicians as "you". Explain what the feature does and why it helps.
-- Open with a fresh line about the moment the feature helps with. Do not start with "Hello, friend" or a generic greeting.
-- {WORDS} words in total, never more. It is read aloud in about 20 seconds.
+JOB 2: VOICE AND TONE. This is the person's message; you are polishing it for Tomo to say, not replacing it.
+- Start from their text. Keep their key words, their specific details, and their order wherever they work. If it already reads well aloud, change very little.
+- Make it sound spoken: warm, welcoming, soothing, and gently playful. A kind friend, not a comedian: no jokes, puns, or sarcasm. Speak to clinicians as "you".
+- Mention JotPsych by name at least once, and make clear what the feature does and why it helps.
+- Only add facts from the list below when they directly support what the person wrote. Do not pad it with other features or numbers they didn't mention.
+- Let the structure follow their content. No fixed formula: no stock openers ("Here's something", "That moment when", "Imagine", "Picture this", "Hello, friend") and no slogan or tagline at the end. Close with a natural line that fits this particular feature.
+- At most 45 words; it is read aloud in about 20 seconds. A short input can become a short script.
 - Plain spoken sentences: no emojis, hashtags, stage directions, brackets, or markdown.
-- End with exactly: "JotPsych. Less charting, more caring."
-- Keep the person's own wording where it already works; change what the guardrails or tone require.
 
 If the input is not about JotPsych, clinical documentation, billing, or practice software (empty, random, rude, or off-topic), set on_topic to false, leave issues empty and script empty.
 
@@ -41,7 +41,7 @@ Reply with only JSON:
 
 export default async (req) => {
   if (req.method !== "POST") return fail("Use POST", 405);
-  const { text: raw, shorter } = await readJson(req);
+  const { text: raw } = await readJson(req);
   const original = typeof raw === "string" ? raw.replace(/\s+/g, " ").trim() : "";
   if (!original) return fail("Describe a JotPsych feature first.");
   if (original.length > 600) return fail("Please keep it under 600 characters.");
@@ -52,7 +52,7 @@ export default async (req) => {
       model: "claude-sonnet-5-5",
       max_tokens: 800,
       thinking: { type: "between_tools" }, // no extended thinking: keeps the call within a few seconds
-      system: SYSTEM.replace("{WORDS}", shorter ? "30 to 36" : "38 to 45"),
+      system: SYSTEM,
       messages: [{ role: "user", content: `<input>${original}</input>` }],
     });
     const body = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("");
